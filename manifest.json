@@ -1,0 +1,20 @@
+{
+  "id": "./index.html",
+  "name": "Kembara Jawi: Dunia Mistik 3D",
+  "short_name": "Kembara Jawi",
+  "description": "Permainan 3D belajar tulisan Jawi Malaysia daripada tahap asas hingga pakar.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#060913",
+  "theme_color": "#0b1530",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

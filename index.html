@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Penjana ZIP Kembara Jawi 3D</title>
+  <style>
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      background: #060913; color: #f8fafc; font-family: system-ui, sans-serif; padding: 18px;
+    }
+    .card {
+      max-width: 540px; width: 100%; background: #0f172a; border: 1.5px solid #f5c451;
+      border-radius: 18px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    h1 { margin: 0 0 8px; color: #fde68a; font-size: 1.35rem; }
+    p { color: #cbd5e1; font-size: 0.92rem; line-height: 1.55; }
+    .step {
+      background: #1e293b; border-radius: 12px; padding: 14px; margin: 14px 0;
+      border: 1px solid rgba(245, 196, 81, 0.25);
+    }
+    input[type="file"] { width: 100%; margin-top: 8px; color: #e2e8f0; }
+    button {
+      width: 100%; padding: 14px; border: none; border-radius: 12px; cursor: pointer;
+      font-weight: 800; font-size: 1rem; margin-top: 10px;
+      background: linear-gradient(135deg, #fbbf24, #d97706); color: #0b0f19;
+    }
+    button.sec {
+      background: rgba(56, 189, 248, 0.15); color: #bae6fd;
+      border: 1px solid rgba(56, 189, 248, 0.45);
+    }
+    #status { margin-top: 12px; font-size: 0.9rem; color: #a7f3d0; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>📦 Penjana Fail ZIP — Kembara Jawi 3D</h1>
+    <p>Alat ini menukar fail permainan anda menjadi pakej <b>.zip</b> lengkap (PWA + Pembina APK GitHub) terus di telefon atau PC.</p>
+
+    <div class="step">
+      <b>Langkah 1:</b> Pilih fail <code>kembara-jawi.html</code> (yang anda simpan daripada jawapan pertama):
+      <input type="file" id="html-file" accept=".html,.htm" />
+    </div>
+
+    <button id="btn-make-full">⬇️ Muat Turun ZIP Lengkap (kembara-jawi-lengkap.zip)</button>
+    <button id="btn-make-support" class="sec">⬇️ Muat Turun Fail Sokongan Sahaja (Tanpa HTML)</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1530"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="195" fill="none" stroke="url(#gold)" stroke-width="14" opacity="0.85"/>
+  <text x="256" y="275" text-anchor="middle" font-family="serif" font-size="140" font-weight="bold" fill="url(#gold)">جاوي</text>
+  <text x="256" y="370" text-anchor="middle" font-family="sans-serif" font-size="40" font-weight="bold" fill="#38bdf8">KEMBARA 3D</text>
+</svg>`;
+
+    const MANIFEST_JSON = JSON.stringify({
+      id: "./index.html",
+      name: "Kembara Jawi: Dunia Mistik 3D",
+      short_name: "Kembara Jawi",
+      description: "Permainan 3D belajar tulisan Jawi Malaysia daripada tahap asas hingga pakar.",
+      start_url: "./index.html",
+      scope: "./",
+      display: "fullscreen",
+      orientation: "landscape",
+      background_color: "#060913",
+      theme_color: "#0b1530",
+      icons: [{
+        src: "icon.svg",
+        sizes: "192x192 512x512",
+        type: "image/svg+xml",
+        purpose: "any maskable"
+      }]
+    }, null, 2);
+
+    const SW_JS = `const CACHE_NAME = 'kembara-jawi-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon.svg',
+  'https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(ASSETS)).catch(() => {}));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.keys().then((keys) =>
+    Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+  ));
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      return cached || fetch(event.request).then((resp) => {
+        if (resp && resp.status === 200 && event.request.method === 'GET') {
+          const copy = resp.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));
+        }
+        return resp;
+      }).catch(() => cached);
+    })
+  );
+});`;
+
+    const BUILD_APK_YML = `name: Bina APK Kembara Jawi 3D
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Muat turun fail projek
+        uses: actions/checkout@v4
+      - name: Pasang Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Pasang Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Sediakan fail web & Three.js Offline
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+          curl -L https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js -o www/three.min.js
+          sed -i 's|https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js|three.min.js|g' www/index.html
+      - name: Bina projek Android Capacitor
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init "Kembara Jawi 3D" "com.jawi.kembara3d" --web-dir www
+          npx cap add android
+      - name: Kompil fail APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Simpan fail APK untuk dimuat turun
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kembara-Jawi-3D-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk`;
+
+    function injectPwaIntoHtml(rawHtml) {
+      let html = rawHtml;
+      if (!html.includes('manifest.json')) {
+        html = html.replace(
+          '</title>',
+          '</title>\n  <link rel="manifest" href="manifest.json" />\n  <link rel="icon" type="image/svg+xml" href="icon.svg" />\n  <meta name="theme-color" content="#0b1530" />\n  <meta name="mobile-web-app-capable" content="yes" />\n  <meta name="apple-mobile-web-app-capable" content="yes" />'
+        );
+      }
+      if (!html.includes('btn-install-pwa')) {
+        html = html.replace(
+          /(id="btn-start-game"[\s\S]*?<\/button>)/,
+          '$1\n        <button class="btn-secondary" id="btn-install-pwa" style="display:none; font-size:1rem; padding:14px 22px;">📲 Pasang ke Telefon (App)</button>'
+        );
+      }
+      if (!html.includes('serviceWorker.register')) {
+        const pwaScript = `\n  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('btn-install-pwa');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (installBtn) installBtn.style.display = 'inline-flex';
+    });
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installBtn.style.display = 'none';
+      });
+    }
+  </scr` + `ipt>\n</body>`;
+        html = html.replace('</body>', pwaScript);
+      }
+      return html;
+    }
+
+    function buildZip(fileList) {
+      const enc = new TextEncoder();
+      const crcTable = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+        crcTable[n] = c >>> 0;
+      }
+      const crc32 = (bytes) => {
+        let c = 0xffffffff;
+        for (let i = 0; i < bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+        return (c ^ 0xffffffff) >>> 0;
+      };
+
+      const localParts = [];
+      const centralParts = [];
+      let offset = 0;
+
+      for (const f of fileList) {
+        const nameBytes = enc.encode(f.name);
+        const dataBytes = enc.encode(f.content);
+        const crc = crc32(dataBytes);
+        const len = dataBytes.length;
+
+        const lh = new ArrayBuffer(30 + nameBytes.length);
+        const lv = new DataView(lh);
+        lv.setUint32(0, 0x04034b50, true);
+        lv.setUint16(4, 20, true);
+        lv.setUint16(6, 0x0800, true);
+        lv.setUint16(8, 0, true);
+        lv.setUint16(10, 0, true);
+        lv.setUint16(12, 0x5421, true);
+        lv.setUint32(14, crc, true);
+        lv.setUint32(18, len, true);
+        lv.setUint32(22, len, true);
+        lv.setUint16(26, nameBytes.length, true);
+        lv.setUint16(28, 0, true);
+        new Uint8Array(lh, 30).set(nameBytes);
+        localParts.push(new Uint8Array(lh), dataBytes);
+
+        const ch = new ArrayBuffer(46 + nameBytes.length);
+        const cv = new DataView(ch);
+        cv.setUint32(0, 0x02014b50, true);
+        cv.setUint16(4, 20, true);
+        cv.setUint16(6, 20, true);
+        cv.setUint16(8, 0x0800, true);
+        cv.setUint16(10, 0, true);
+        cv.setUint16(12, 0, true);
+        cv.setUint16(14, 0x5421, true);
+        cv.setUint32(16, crc, true);
+        cv.setUint32(20, len, true);
+        cv.setUint32(24, len, true);
+        cv.setUint16(28, nameBytes.length, true);
+        cv.setUint16(30, 0, true);
+        cv.setUint16(32, 0, true);
+        cv.setUint16(34, 0, true);
+        cv.setUint16(36, 0, true);
+        cv.setUint32(38, 0, true);
+        cv.setUint32(42, offset, true);
+        new Uint8Array(ch, 46).set(nameBytes);
+        centralParts.push(new Uint8Array(ch));
+
+        offset += 30 + nameBytes.length + len;
+      }
+
+      let cdSize = 0;
+      for (const cp of centralParts) cdSize += cp.length;
+
+      const eocd = new ArrayBuffer(22);
+      const ev = new DataView(eocd);
+      ev.setUint32(0, 0x06054b50, true);
+      ev.setUint16(4, 0, true);
+      ev.setUint16(6, 0, true);
+      ev.setUint16(8, fileList.length, true);
+      ev.setUint16(10, fileList.length, true);
+      ev.setUint32(12, cdSize, true);
+      ev.setUint32(16, offset, true);
+      ev.setUint16(20, 0, true);
+
+      return new Blob([...localParts, ...centralParts, new Uint8Array(eocd)], { type: 'application/zip' });
+    }
+
+    function downloadBlob(blob, filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+
+    const baseFiles = [
+      { name: 'icon.svg', content: ICON_SVG },
+      { name: 'manifest.json', content: MANIFEST_JSON },
+      { name: 'sw.js', content: SW_JS },
+      { name: '.github/workflows/build-apk.yml', content: BUILD_APK_YML }
+    ];
+
+    document.getElementById('btn-make-full').onclick = async () => {
+      const input = document.getElementById('html-file');
+      const status = document.getElementById('status');
+      if (!input.files || !input.files[0]) {
+        status.style.color = '#fda4af';
+        status.textContent = '⚠️ Sila pilih fail kembara-jawi.html pada Langkah 1 dahulu.';
+        return;
+      }
+      const rawHtml = await input.files[0].text();
+      const updatedHtml = injectPwaIntoHtml(rawHtml);
+      const zipBlob = buildZip([{ name: 'index.html', content: updatedHtml }, ...baseFiles]);
+      downloadBlob(zipBlob, 'kembara-jawi-lengkap.zip');
+      status.style.color = '#a7f3d0';
+      status.textContent = '✅ Berjaya! Fail kembara-jawi-lengkap.zip telah dimuat turun.';
+    };
+
+    document.getElementById('btn-make-support').onclick = () => {
+      const zipBlob = buildZip(baseFiles);
+      downloadBlob(zipBlob, 'kembara-jawi-sokongan.zip');
+      const status = document.getElementById('status');
+      status.style.color = '#a7f3d0';
+      status.textContent = '✅ Fail sokongan (.zip) berjaya dimuat turun! Cuma tambah index.html di dalamnya.';
+    };
+  </script>
+</body>
+</html>
